@@ -1,0 +1,42 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+
+package filemsg;
+
+// как будто бы хочется использовать one of чтобы было меньше структур
+
+option go_package = "./;filemsg";
+
+service FileService {
+    rpc GetFileNames (google.protobuf.Empty) returns (FileListResponse);
+    rpc GetFileInfo (FileRequest) returns (FileInfoResponse);
+    rpc GetFileData (stream FileRequest) returns (stream FileDataResponse);
+}
+
+// вообще, как я понимаю лучше stream, тк в тоерии это должно работать эффективнее, чем просто bytes
+// но, я не делаю внутри взятия из файла определённого отрезка байт, чтобы сразу отправить, так что не уверен
+// что именно в моей реализации это как-то хорошо, но в целом отправлять много в одном ответе это плохо
+// хотя эта проблемма тоже, как я понимаю решена - вообщем мега не уверен
+
+// need got to stream data bytes in correct order
+message FileRequest {
+    oneof param {
+        bool got = 1;
+        string name = 2;
+    }
+}
+
+message FileListResponse {
+    repeated string name = 1;
+}
+
+message FileDataResponse {
+    bytes data = 1;
+}
+
+message FileInfoResponse {
+    string name = 1;
+    int64 size = 2;
+    uint32 mode = 3;
+    int64 time = 4;
+}
