@@ -4,10 +4,9 @@ import (
 	"context"
 	"homework/server/internal/file"
 	"homework/server/internal/ports/grpcserver/filemsg"
-	"io"
-	"log"
 	"time"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -15,69 +14,77 @@ import (
 
 // TODO add option settings for it
 
-const RequestTimeout = time.Second
-const StreamTimeout = time.Second * 10
+const (
+	RequestTimeout   = time.Second
+	StreamTimeout    = time.Second * 10
+	MaxLoggedDataLen = 15
+)
 
-func GetFileInfo(addr string, fileName string) (*file.FileInfo, error) {
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+func (c *client) GetFileInfo(addr string, fileName string) (*file.FileInfo, error) {
+	c.logger.Info("Send get file info request",
+		zap.String("addr", addr), zap.String("fileName", fileName))
+
+	fsc, conn, err := c.createNewFileServiceClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
 		return nil, err
 	}
 	defer conn.Close()
 
-	c := filemsg.NewFileServiceClient(conn)
-
 	ctx, cancel := context.WithTimeout(context.Background(), RequestTimeout)
 	defer cancel()
 
-	fi, err := c.GetFileInfo(ctx, &filemsg.FileRequest{Param: &filemsg.FileRequest_Name{Name: fileName}})
+	fi, err := fsc.GetFileInfo(ctx, &filemsg.FileRequest{Param: &filemsg.FileRequest_Name{Name: fileName}})
 	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+		c.logger.Error("Failed to get file info", zap.Error(err))
 		return nil, err
 	}
 
-	return GrpcFileInfoToServerFileInfo(fi), nil
+	c.logger.Info("Get file info response",
+		zap.String("Name", fi.Name), zap.Int64("Size", fi.Size), zap.Uint32("Mode", fi.Mode), zap.Int64("ModTime", fi.Time))
+
+	return grpcFileInfoToServerFileInfo(fi), nil
 }
 
-func GetFileNames(addr string) ([]string, error) {
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+func (c *client) GetFileNames(addr string) ([]string, error) {
+	c.logger.Info("Send get file names request", zap.String("addr", addr))
+
+	fsc, conn, err := c.createNewFileServiceClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
 		return nil, err
 	}
 	defer conn.Close()
 
-	c := filemsg.NewFileServiceClient(conn)
-
 	ctx, cancel := context.WithTimeout(context.Background(), RequestTimeout)
 	defer cancel()
 
-	names, err := c.GetFileNames(ctx, &emptypb.Empty{})
+	names, err := fsc.GetFileNames(ctx, &emptypb.Empty{})
 	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+		c.logger.Error("Failed to get file names", zap.Error(err))
 		return nil, err
 	}
+
+	c.logger.Info("Get file names response",
+		zap.Strings("Names", names.Name))
 
 	return names.Name, nil
 }
 
-func GetFileData(addr string, fileName string) ([]byte, error) {
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func (c *client) GetFileData(addr string, fileName string) ([]byte, error) {
+	c.logger.Info("Send get file data request",
+		zap.String("addr", addr), zap.String("fileName", fileName))
+
+	fsc, conn, err := c.createNewFileServiceClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
 		return nil, err
 	}
 	defer conn.Close()
 
-	c := filemsg.NewFileServiceClient(conn)
-
 	ctx, cancel := context.WithTimeout(context.Background(), StreamTimeout)
 	defer cancel()
 
-	stream, err := c.GetFileData(ctx)
+	stream, err := fsc.GetFileData(ctx)
 	if err != nil {
-		log.Fatalf("Error creating stream: %v", err)
+		c.logger.Error("Failed to get file data", zap.Error(err))
 		return nil, err
 	}
 
@@ -91,30 +98,13 @@ func GetFileData(addr string, fileName string) ([]byte, error) {
 		return nil, err
 	}
 
-	return data, err
-}
-
-func sendFileName(stream filemsg.FileService_GetFileDataClient, fn string) error {
-	err := stream.Send(&filemsg.FileRequest{Param: &filemsg.FileRequest_Name{Name: fn}})
-	return err
-}
-
-func getFileData(stream filemsg.FileService_GetFileDataClient) ([]byte, error) {
-	data := newFileData()
-
-	for {
-		in, err := stream.Recv()
-		if err == io.EOF { // End of stream
-			break
-		}
-		if err != nil {
-			log.Printf("Failed to receive a message : %v", err)
-			return []byte{}, err
-		}
-
-		data.addData(in.Data)
-		stream.Send(&filemsg.FileRequest{Param: &filemsg.FileRequest_Got{Got: true}})
+	if len(data) <= MaxLoggedDataLen {
+		c.logger.Info("Get data response",
+			zap.Int("Size", len(data)), zap.Binary("Data", data))
+	} else {
+		c.logger.Info("Get data response",
+			zap.Int("Size", len(data)))
 	}
 
-	return data.getData(), nil
+	return data, err
 }
