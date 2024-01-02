@@ -5,6 +5,7 @@ package filemsg;
 
 // как будто бы хочется использовать one of чтобы было меньше структур
 
+import "validate/validate.proto";
 option go_package = "./;filemsg";
 
 service FileService {
@@ -22,12 +23,12 @@ service FileService {
 message FileRequest {
     oneof param {
         bool got = 1;
-        string name = 2;
+        string name = 2 [(validate.rules).string.min_len = 1];
     }
 }
 
 message FileListResponse {
-    repeated string name = 1;
+    repeated string name = 1 [(validate.rules).string.min_len = 1];
 }
 
 message FileDataResponse {
@@ -35,7 +36,7 @@ message FileDataResponse {
 }
 
 message FileInfoResponse {
-    string name = 1;
+    string name = 1 [(validate.rules).string.min_len = 1];
     int64 size = 2;
     uint32 mode = 3;
     int64 time = 4;
