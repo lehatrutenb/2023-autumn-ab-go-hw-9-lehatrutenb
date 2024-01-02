@@ -23,7 +23,7 @@ jobs:
 
     - name: Build
       working-directory: ./homework
-      run: go build -v ./homework/...
+      run: go build -v ./...
 
     - name: Test
       working-directory: ./homework
