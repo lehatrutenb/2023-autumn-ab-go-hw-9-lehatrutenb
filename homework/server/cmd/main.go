@@ -54,11 +54,13 @@ func RunServer(addr string, repoaddr string, slg ServerLoggers, opts ...grpcserv
 	}
 }
 
+// можно сказать, что это надо положить в client.go , но мне кажется нет, тк по смыслу всё-таки
+// не так далеко от раннера для сервера
 type ClientLogger struct {
 	Logger *zap.Logger
 }
 
-func RunClient(clg ClientLogger, opts ...grpcclient.ClientOption) *grpcclient.Client {
+func CreateClient(clg ClientLogger, opts ...grpcclient.ClientOption) *grpcclient.Client {
 	var err error
 
 	if clg.Logger == nil {
@@ -84,6 +86,6 @@ func main() {
 	if *server {
 		RunServer(*serverAddr, *repoAddr, ServerLoggers{})
 	} else {
-		RunClient(ClientLogger{})
+		CreateClient(ClientLogger{})
 	}
 }

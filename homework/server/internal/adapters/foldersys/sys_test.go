@@ -64,7 +64,7 @@ func (ts *AppTestSuite) TestGetFileByNameInfo() {
 	assert.Equal(ts.t, exp, info)
 }
 
-func TestClientMainFuncs(t *testing.T) {
+func TestRepoMainFuncs(t *testing.T) {
 	ts := AppTestSuite{t: t}
 	suite.Run(t, &ts)
 }

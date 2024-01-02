@@ -24,7 +24,7 @@ type ClientServerTestSuite struct {
 }
 
 func (ts *ClientServerTestSuite) SetupSuite() {
-	ts.client = RunClient(ClientLogger{})
+	ts.client = CreateClient(ClientLogger{})
 	ts.addr = ":8080"
 
 	path, err := os.Getwd()
