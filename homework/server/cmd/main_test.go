@@ -61,6 +61,12 @@ func (ts *ClientServerTestSuite) SetupSuite() {
 	assert.NoError(ts.t, err1)
 	assert.NoError(ts.t, err2)
 
+	err1 = f1.Close()
+	err2 = f2.Close()
+
+	assert.NoError(ts.t, err1)
+	assert.NoError(ts.t, err2)
+
 	go RunServer(ts.addr, path, ServerLoggers{})
 }
 
