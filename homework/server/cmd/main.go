@@ -5,8 +5,9 @@ import (
 	"homework/server/internal/adapters/foldersys"
 	"homework/server/internal/app"
 	"homework/server/internal/ports/grpcserver"
+	"homework/server/internal/starboards/grpcclient"
+
 	"log"
-	"net"
 
 	"go.uber.org/zap"
 )
@@ -18,42 +19,71 @@ import (
 
 // TODO add server gracefull shutdown
 
-func RunServer(addr string, repoaddr string) {
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
+type ServerLoggers struct {
+	ServerLogger *zap.Logger
+	RepoLogger   *zap.Logger
+}
 
+func RunServer(addr string, repoaddr string, slg ServerLoggers, opts ...grpcserver.ServerOption) {
 	// вообще, очень хочется 2 логера, тк кажется, что это как почти 2 разных продукта
 	// тут, конечно есть небольшая делема - нужно ли делать логгер внутри app при том условии
 	// что сам app не генерирует ошибки, а просто прослойка
-	serverLogger, err := zap.NewProduction(zap.WithCaller(true))
-	if err != nil {
-		log.Fatalf("Failed to init logger: %v", err)
-	}
-	defer serverLogger.Sync()
+	var err error
 
-	repoLogger, err := zap.NewProduction(zap.WithCaller(true))
-	if err != nil {
-		log.Fatalf("Failed to init logger: %v", err)
+	if slg.ServerLogger == nil {
+		slg.ServerLogger, err = zap.NewProduction(zap.WithCaller(true))
+		if err != nil {
+			log.Fatalf("Failed to init logger: %v", err)
+		}
+		defer slg.ServerLogger.Sync()
 	}
-	defer repoLogger.Sync()
 
-	s := grpcserver.NewServer(app.NewApp(foldersys.NewRepo(repoaddr, repoLogger)), serverLogger)
-	serverLogger.Info("Server is listenning", zap.String("addr", addr))
+	if slg.RepoLogger == nil {
+		slg.RepoLogger, err = zap.NewProduction(zap.WithCaller(true))
+		if err != nil {
+			log.Fatalf("Failed to init logger: %v", err)
+		}
+		defer slg.RepoLogger.Sync()
+	}
+
+	lis, s := grpcserver.NewServer(app.NewApp(foldersys.NewRepo(repoaddr, slg.RepoLogger)), slg.ServerLogger, addr, opts...)
+
+	slg.ServerLogger.Info("Server is listenning", zap.String("addr", addr))
 	if err := s.Serve(lis); err != nil {
-		serverLogger.Fatal("Failed to serve", zap.Error(err))
+		slg.ServerLogger.Fatal("Failed to serve", zap.Error(err))
 	}
 }
 
+type ClientLogger struct {
+	Logger *zap.Logger
+}
+
+func RunClient(clg ClientLogger, opts ...grpcclient.ClientOption) *grpcclient.Client {
+	var err error
+
+	if clg.Logger == nil {
+		clg.Logger, err = zap.NewProduction(zap.WithCaller(true))
+		if err != nil {
+			log.Fatalf("Failed to init logger: %v", err)
+		}
+	}
+
+	return grpcclient.NewClient(clg.Logger, opts...)
+}
+
 func main() {
-	var addr = flag.String("addr", ":8081", "Server listening address")
-	var repoaddr = flag.String("repoaddr", "", "Server folder system address")
+	var server = flag.Bool("server", false, "Set that flag to run sever, not client")
+	var serverAddr = flag.String("serveraddr", ":8081", "Server listening address")
+	var repoAddr = flag.String("repoaddr", "", "Server folder system address")
 	flag.Parse()
 
-	if addr == nil || repoaddr == nil {
+	if serverAddr == nil || repoAddr == nil || server == nil {
 		log.Fatal("Can't parse server address or repoaddress from flags")
 	}
 
-	RunServer(*addr, *repoaddr)
+	if *server {
+		RunServer(*serverAddr, *repoAddr, ServerLoggers{})
+	} else {
+		RunClient(ClientLogger{})
+	}
 }

@@ -14,7 +14,7 @@ import (
 
 // dto funcs promise to log errors themselve
 
-func (c *client) createNewFileServiceClient(addr string, opts ...grpc.DialOption) (filemsg.FileServiceClient, *grpc.ClientConn, error) {
+func (c *Client) createNewFileServiceClient(addr string, opts ...grpc.DialOption) (filemsg.FileServiceClient, *grpc.ClientConn, error) {
 	conn, err := grpc.Dial(addr, opts...)
 	if err != nil {
 		c.logger.Fatal("Failed to connect to server", zap.Error(err))

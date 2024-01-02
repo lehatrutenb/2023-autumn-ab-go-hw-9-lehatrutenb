@@ -11,8 +11,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-const MaxLoggedDataLen = 15
-
 // мне не нравятся названия функций, но я пока не придумал как сделать лучше
 // кажется, что было бы сильно проще использовать вместо oneof дополнительный message для GetFileInfo
 
@@ -49,7 +47,7 @@ func (s *server) GetFileData(stream filemsg.FileService_GetFileDataServer) error
 		return err
 	}
 
-	if len(*data) <= 1 && len((*data)[0]) < MaxLoggedDataLen {
+	if len(*data) <= 1 && len((*data)[0]) < s.MaxLoggedDataLen {
 		s.logger.Info("Send data response",
 			zap.Int("Size", len((*data)[0])), zap.Binary("Data", (*data)[0]))
 	} else {

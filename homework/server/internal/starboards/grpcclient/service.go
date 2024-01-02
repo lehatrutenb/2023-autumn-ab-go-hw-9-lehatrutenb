@@ -4,7 +4,6 @@ import (
 	"context"
 	"homework/server/internal/file"
 	"homework/server/internal/ports/grpcserver/filemsg"
-	"time"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -12,15 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// TODO add option settings for it
-
-const (
-	RequestTimeout   = time.Second
-	StreamTimeout    = time.Second * 10
-	MaxLoggedDataLen = 15
-)
-
-func (c *client) GetFileInfo(addr string, fileName string) (*file.FileInfo, error) {
+func (c *Client) GetFileInfo(addr string, fileName string) (*file.FileInfo, error) {
 	c.logger.Info("Send get file info request",
 		zap.String("addr", addr), zap.String("fileName", fileName))
 
@@ -30,7 +21,7 @@ func (c *client) GetFileInfo(addr string, fileName string) (*file.FileInfo, erro
 	}
 	defer conn.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), RequestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.RequestTimeout)
 	defer cancel()
 
 	fi, err := fsc.GetFileInfo(ctx, &filemsg.FileRequest{Param: &filemsg.FileRequest_Name{Name: fileName}})
@@ -45,7 +36,7 @@ func (c *client) GetFileInfo(addr string, fileName string) (*file.FileInfo, erro
 	return grpcFileInfoToServerFileInfo(fi), nil
 }
 
-func (c *client) GetFileNames(addr string) ([]string, error) {
+func (c *Client) GetFileNames(addr string) ([]string, error) {
 	c.logger.Info("Send get file names request", zap.String("addr", addr))
 
 	fsc, conn, err := c.createNewFileServiceClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
@@ -54,7 +45,7 @@ func (c *client) GetFileNames(addr string) ([]string, error) {
 	}
 	defer conn.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), RequestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.RequestTimeout)
 	defer cancel()
 
 	names, err := fsc.GetFileNames(ctx, &emptypb.Empty{})
@@ -69,7 +60,7 @@ func (c *client) GetFileNames(addr string) ([]string, error) {
 	return names.Name, nil
 }
 
-func (c *client) GetFileData(addr string, fileName string) ([]byte, error) {
+func (c *Client) GetFileData(addr string, fileName string) ([]byte, error) {
 	c.logger.Info("Send get file data request",
 		zap.String("addr", addr), zap.String("fileName", fileName))
 
@@ -79,7 +70,7 @@ func (c *client) GetFileData(addr string, fileName string) ([]byte, error) {
 	}
 	defer conn.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), StreamTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.StreamTimeout)
 	defer cancel()
 
 	stream, err := fsc.GetFileData(ctx)
@@ -98,7 +89,7 @@ func (c *client) GetFileData(addr string, fileName string) ([]byte, error) {
 		return nil, err
 	}
 
-	if len(data) <= MaxLoggedDataLen {
+	if len(data) <= c.MaxLoggedDataLen {
 		c.logger.Info("Get data response",
 			zap.Int("Size", len(data)), zap.Binary("Data", data))
 	} else {
