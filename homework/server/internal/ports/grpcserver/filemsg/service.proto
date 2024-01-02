@@ -3,7 +3,7 @@ import "google/protobuf/empty.proto";
 
 package filemsg;
 
-// как будто бы хочется использовать one of чтобы было меньше структур
+// как будто бы хочется перестать использовать one of чтобы читаемость кода была лучше (чтобы не писать type switch)
 
 import "validate/validate.proto";
 option go_package = "./;filemsg";
